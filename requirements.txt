@@ -2,5 +2,4 @@ streamlit
 requests
 python-dotenv
 spacy
-w2n
-
+word2number
