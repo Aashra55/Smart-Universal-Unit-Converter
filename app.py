@@ -3,18 +3,13 @@ import streamlit as st
 import requests
 from dotenv import load_dotenv
 import spacy
-from spacy.cli import download
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Load NLP model
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
-    
+nlp = spacy.blank("en")
+
 # Conversion factors for different units
 conversion_factors = {
     "Length": {
