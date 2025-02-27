@@ -3,6 +3,8 @@ import streamlit as st
 import requests
 from dotenv import load_dotenv
 import spacy
+from word2number import w2n
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -53,33 +55,94 @@ def extract_units_from_text(text):
     doc = nlp(text)
 
     value = None
-    from_unit = None
-    to_unit = None
-    
+    detected_units = []  # Store detected units
+
+    print(f"\n🔍 Debugging NLP Extraction: {text}")
+    print(f"Tokens Detected: {[token.text for token in doc]}")
+
+    for token in doc:
+        token_text = token.text.lower().strip()
+        is_number = False  # Flag to mark if this token is a number
+
+        # First, check if token is a numeric string using regex (e.g., "5" or "5.0")
+        if re.match(r'^\d+(\.\d+)?$', token_text):
+            try:
+                value = float(token_text)
+                is_number = True
+            except ValueError:
+                pass  # Should rarely happen
+        else:
+            # If not a plain number, try converting word-based numbers (e.g., "five")
+            try:
+                converted_value = w2n.word_to_num(token_text)
+                value = float(converted_value)
+                is_number = True
+            except ValueError:
+                pass  # Not a number word, ignore
+
+        # Only check for unit if the token wasn't identified as a number
+        if not is_number:
+            # Check if token is a valid unit from unit_mappings
+            if token_text in unit_mappings:
+                detected_units.append(unit_mappings[token_text])
+            # Detect currency codes (e.g., USD, EUR)
+            elif len(token_text) == 3 and token_text.isalpha() and token_text.upper() not in unit_mappings:
+                detected_units.append(token_text.upper())
+
+    print(f"🔎 Extracted Value: {value}, Units: {detected_units}")
+
+    # Assign detected units properly
+    from_unit = detected_units[0] if len(detected_units) > 0 else None
+    to_unit = detected_units[1] if len(detected_units) > 1 else None
+
+    return value, from_unit, to_unit
+
+
+# Load NLP model
+nlp = spacy.blank("en")
+
+def extract_units_from_text(text):
+    """Extracts value, from_unit, and to_unit from user input."""
+    doc = nlp(text)
+
+    value = None
     detected_units = []  # Store detected units
 
     print(f"\n🔍 Debugging NLP Extraction: {text}")
     print(f"Tokens Detected: {[token.text for token in doc]}")  # Show all tokens
 
     for token in doc:
-        print(f"👉 Token: {token.text}, Like_Num: {token.like_num}")  # Check detected tokens
-        if token.like_num:  # Detect numbers
-            value = float(token.text)
-        elif token.text.lower() in unit_mappings:  # Detect regular units
-            detected_units.append(unit_mappings[token.text.lower()])
-        elif len(token.text) == 3 and token.text.isalpha() and token.text.upper() not in unit_mappings:
-            detected_units.append(token.text.upper())  # Detect currency codes properly
+        token_text = token.text.lower().strip()
 
-                            
+        # First, check if token is a numeric string using regex (e.g., "5" or "5.0")
+        if re.match(r'^\d+(\.\d+)?$', token_text):
+            try:
+                value = float(token_text)
+            except ValueError:
+                pass  # Should rarely happen
+        else:
+            # If not a plain number, try converting word-based numbers (e.g., "five")
+            try:
+                converted_value = w2n.word_to_num(token_text)
+                value = float(converted_value)
+            except ValueError:
+                pass  # Not a number word, ignore
+
+        # Check if token is a valid unit from unit_mappings
+        if token_text in unit_mappings:
+            detected_units.append(unit_mappings[token_text])
+        # Detect currency codes (e.g., USD, EUR)
+        elif len(token_text) == 3 and token_text.isalpha() and token_text.upper() not in unit_mappings:
+            detected_units.append(token_text.upper())
+
+    print(f"🔎 Extracted Value: {value}, Units: {detected_units}")
+
     # Assign detected units properly
-    if len(detected_units) >= 2:
-        from_unit, to_unit = detected_units[:2]
-    elif len(detected_units) == 1:
-        from_unit = detected_units[0]
-
-    print(f"Debug: Extracted - Value: {value}, From: {from_unit}, To: {to_unit}")  # Debug output
+    from_unit = detected_units[0] if len(detected_units) > 0 else None
+    to_unit = detected_units[1] if len(detected_units) > 1 else None
 
     return value, from_unit, to_unit
+
     
 # Logic for temperature conversion
 def convert_temperature (value, from_unit, to_unit):
