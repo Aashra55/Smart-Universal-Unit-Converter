@@ -2,5 +2,5 @@ streamlit
 requests
 python-dotenv
 spacy
-re
 w2n
+
